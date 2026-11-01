@@ -24,7 +24,7 @@ def _prepare_nodes(
     content: list[nodes.Node],
     source_docname: str,
 ) -> list[nodes.Node]:
-    """Namespace copied targets and retain external reference origins."""
+    """Prefix copied targets and retain external reference origins."""
     container = nodes.container()
     container.extend(item=content)
     serial = directive.env.new_serialno(category="section-include")

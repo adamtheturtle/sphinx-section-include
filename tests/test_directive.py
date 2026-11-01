@@ -111,13 +111,9 @@ def test_include_preserves_content_and_links(
     tree = app.env.get_doctree(docname="overview")
     assert "Included instructions." in tree.astext()
     assert "Other source content." not in tree.astext()
-    assert len(
-        [
-            node
-            for node in tree.findall()
-            if getattr(node, "tagname", "") == "section"
-        ]
-    ) == (3 if include_heading else 2)
+    assert len(list(tree.findall(condition=nodes.section))) == (
+        3 if include_heading else 2
+    )
     if buildername in {"html", "dirhtml"}:
         filename = (
             "overview.html" if buildername == "html" else "overview/index.html"
@@ -153,7 +149,7 @@ def test_include_preserves_content_and_links(
         assert image is not None
         assert "pixel.png" in str(object=image["src"])
     dependencies = {
-        str(object=path) for path in app.env.dependencies["overview"]
+        Path(path).as_posix() for path in app.env.dependencies["overview"]
     }
     assert any(path.endswith("manual/source.rst") for path in dependencies)
     assert any(path.endswith("manual/details.txt") for path in dependencies)

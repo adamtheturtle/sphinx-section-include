@@ -1,4 +1,5 @@
 Docutils
+URI
 admin
 beartype
 changelog
@@ -19,6 +20,7 @@ reportUnknownParameterType
 reportUnknownVariableType
 rst
 str
+subtree
 tuple
 ty
 whitespace

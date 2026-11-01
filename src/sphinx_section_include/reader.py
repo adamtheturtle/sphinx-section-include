@@ -53,8 +53,9 @@ def read_document(
     path = resolve_source(directive=directive, source=source)
     root = Path(directive.env.srcdir).resolve()
     parent = directive.state.document
-    raw_ancestors = parent.get(key="_section_include_sources")
-    ancestors: tuple[str, ...] = () if raw_ancestors is None else raw_ancestors
+    ancestors = tuple[str, ...](
+        parent.get(key="_section_include_sources", failobj=())
+    )
     if str(object=path) in ancestors:
         message = f"Circular section include involving {path.name!r}"
         raise ValueError(message)
