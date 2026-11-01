@@ -125,5 +125,4 @@ styles/*
 .ty_cache/
 sample/build/
 
-# Dependency locks are application-specific.
-uv.lock
+sample/build-parallel/

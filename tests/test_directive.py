@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from docutils import nodes
 from sphinx.errors import NoUri
 from sphinx.testing.util import SphinxTestApp
+from sphinx.util.parallel import parallel_available
 
 from sphinx_section_include.directive import resolve_included_references
 
@@ -155,10 +156,23 @@ def test_include_preserves_content_and_links(
     assert any(path.endswith("manual/details.txt") for path in dependencies)
 
 
+@pytest.mark.parametrize(
+    argnames="parallel",
+    argvalues=[
+        1,
+        pytest.param(
+            2,
+            marks=pytest.mark.skipif(
+                condition=not parallel_available,
+                reason="Sphinx parallel readers require POSIX",
+            ),
+        ),
+    ],
+)
 def test_repeated_inclusion_namespaces_targets(
-    *, make_app: Callable[..., SphinxTestApp], tmp_path: Path
+    *, make_app: Callable[..., SphinxTestApp], tmp_path: Path, parallel: int
 ) -> None:
-    """Repeated excerpts keep separate anchors and local references."""
+    """Serial and parallel readers retain separate excerpt anchors."""
     directive = (
         ".. include-section:: manual/source.rst\n   :section: #co"
         "nfiguration\n   :include-heading:\n\n"
@@ -171,7 +185,7 @@ def test_repeated_inclusion_namespaces_targets(
     )
     index = source / "index.rst"
     _ = index.write_text(data=index.read_text() + "   second\n")
-    app = make_app(srcdir=source, exception_on_warning=True)
+    app = make_app(srcdir=source, parallel=parallel, exception_on_warning=True)
     app.build()
     assert app.warning.getvalue() == ""
     soup = BeautifulSoup(
