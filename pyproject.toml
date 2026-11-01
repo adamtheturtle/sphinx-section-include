@@ -1,0 +1,461 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+    "setuptools>=77.0.0",
+    "setuptools-scm>=10.3.4",
+]
+
+[project]
+name = "sphinx-section-include"
+description = "Include selected sections of reStructuredText documents in Sphinx projects."
+readme = { file = "README.rst", content-type = "text/x-rst" }
+keywords = [
+    "documentation",
+    "rst",
+    "sphinx",
+]
+license = "MIT"
+license-files = [ "LICENSE" ]
+authors = [
+    { name = "Adam Dangoor", email = "adamdangoor@gmail.com" },
+]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Sphinx :: Extension",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+]
+dynamic = [
+    "version",
+]
+dependencies = [
+    "docutils>=0.21.2",
+    "sphinx>=9.1.1,<10",
+]
+urls.Issues = "https://github.com/adamtheturtle/sphinx-section-include/issues"
+urls.Source = "https://github.com/adamtheturtle/sphinx-section-include"
+
+[dependency-groups]
+dev = [
+    "actionlint-py==1.7.12.25",
+    "beartype==0.23.1",
+    "beautifulsoup4==4.15.0",
+    "check-manifest==0.51",
+    "deptry==0.25.1",
+    "doc8==2.0.0",
+    "doccmd==2026.9.16.1",
+    "interrogate==1.7.0",
+    "mypy==2.4.0",
+    "mypy-pytest-parametrize==2026.10.5.1",
+    "mypy-strict-kwargs==2026.10.19",
+    "myst-parser==5.1.0",
+    "no-defaults==2026.9.1",
+    "prek==0.5.7",
+    "pydocstringformatter==1.0.0",
+    "pylint[spelling]==4.1.3",
+    "pyproject-fmt==2.30.3",
+    "pyrefly==1.4.0",
+    "pyright==1.1.414",
+    "pyroma==5.0.1",
+    "pytest==9.1.1",
+    "pytest-beartype==0.3.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.3",
+    # We add shellcheck-py not only for shell scripts and shell code blocks,
+    # but also because having it installed means that ``actionlint-py`` will
+    # use it to lint shell commands in GitHub workflow files.
+    "shellcheck-py==0.11.0.1",
+    "shfmt-py==4.2.0",
+    "snapper-fmt==0.11.10",
+    "sphinx-lint==1.0.2",
+    "strict-kwargs==2026.10.9",
+    "towncrier==26.9.0",
+    "ty==0.0.92",
+    "types-docutils==0.23.0.20260923",
+    "vale==3.25.1.0",
+    "vulture==2.16",
+    "yamlfix==1.19.1",
+    "zizmor==1.31.1",
+]
+release = [ "check-wheel-contents==0.6.3", "towncrier==26.9.0" ]
+
+[tool.setuptools]
+packages.find.where = [
+    "src",
+]
+package-data.sphinx_section_include = [ "py.typed" ]
+zip-safe = false
+
+[tool.setuptools_scm]
+# This keeps the start of the version the same as the last release.
+# This is useful for our documentation to include e.g. binary links
+# to the latest released binary.
+#
+# Code to match this is in ``conf.py``.
+version_scheme = "post-release"
+
+[tool.ruff]
+line-length = 79
+lint.select = [
+    "ALL",
+]
+lint.extend-select = [ "ANN", "PGH003", "PYI" ]
+lint.ignore = [
+    # Ruff warns that this conflicts with the formatter.
+    "COM812",
+    # Copyright headers are not required.
+    "CPY001",
+    # Allow our chosen docstring line-style - pydocstringformatter handles formatting
+    # but doesn't enforce D205 (blank line after summary) or D212 (summary on first line).
+    "D205",
+    "D212",
+    "D415",
+    # Ruff warns that this conflicts with the formatter.
+    "ISC001",
+    # Ignore 'too-many-*' errors as they seem to get in the way more than
+    # helping.
+    "PLR0913",
+    # Allow 'assert' as we use it for tests.
+    "S101",
+]
+lint.explicit-preview-rules = true
+lint.per-file-ignores."doccmd_*.py" = [
+    # Allow our chosen docstring line-style - pydocstringformatter handles
+    # formatting but docstrings in docs may not match this style.
+    "D200",
+]
+# The wheel smoke test invokes uv and Python with controlled arguments.
+lint.per-file-ignores."tests/wheel_smoke.py" = [ "S603", "S607", "T201" ]
+# Do not automatically remove commented out code.
+# We comment out code during development, and with VSCode auto-save, this code
+# is sometimes annoyingly removed.
+lint.unfixable = [
+    "ERA001",
+]
+lint.external = [ "NOD" ]
+lint.flake8-tidy-imports.banned-api."operator.attrgetter".msg = "operator.attrgetter is banned: use a lambda instead."
+lint.flake8-tidy-imports.banned-api."typing.cast".msg = """\
+    typing.cast is banned: use explicit type narrowing or a typed variable instead.\
+    """
+lint.pydocstyle.convention = "google"
+lint.preview = true
+
+[tool.pylint]
+# Disable the message, report, category or checker with the given id(s). You
+# can either give multiple identifiers separated by comma (,) or put this
+# option multiple times (only on the command line, not in the configuration
+# file where it should appear only once).You can also use "--disable=all" to
+# disable everything first and then reenable specific checks. For example, if
+# you want to run only the similarities checker, you can use "--disable=all
+# --enable=similarities". If you want to run only the classes checker, but have
+# no Warning level messages displayed, use"--disable=all --enable=classes
+# --disable=W"
+"MESSAGES CONTROL".disable = [
+    # Too difficult to please
+    "duplicate-code",
+    # Let flake8 handle long lines
+    "line-too-long",
+    "locally-disabled",
+    "missing-return-type-doc",
+    # We don't need everything to be documented because of mypy
+    "missing-type-doc",
+    # Let ruff find protected member access.
+    "protected-access",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-positional-arguments",
+    "too-many-return-statements",
+    # Let ruff deal with sorting
+    "ungrouped-imports",
+    # Let ruff handle unused imports
+    "unused-import",
+    # Let ruff handle imports
+    "wrong-import-order",
+]
+# Enable the message, report, category or checker with the given id(s). You can
+# either give multiple identifier separated by comma (,) or put this option
+# multiple time (only on the command line, not in the configuration file where
+# it should appear only once). See also the "--disable" option for examples.
+"MESSAGES CONTROL".enable = [
+    "bad-inline-option",
+    "deprecated-pragma",
+    "file-ignored",
+    "spelling",
+    "use-symbolic-message-instead",
+    "useless-suppression",
+]
+DEPRECATED_BUILTINS.bad-functions = [
+    # Use Pylint until Ruff can ban bare builtin calls, or until custom rules
+    # make this removable:
+    # https://github.com/astral-sh/ruff/issues/10079
+    # https://github.com/astral-sh/ruff/issues/970
+    "filter",
+    "getattr",
+    "hasattr",
+    "map",
+    "setattr",
+]
+# Allow the body of an if to be on the same line as the test if there is no
+# else.
+FORMAT.single-line-if-stmt = false
+# Return non-zero exit code if useless-suppression is emitted.
+MAIN.fail-on = [
+    "useless-suppression",
+]
+# Use multiple processes to speed up Pylint.
+MASTER.jobs = 0
+# List of plugins (as comma separated values of python modules names) to load,
+# usually to register additional checkers.
+# See https://chezsoi.org/lucas/blog/pylint-strict-base-configuration.html.
+# We do not use the plugins:
+# - pylint.extensions.code_style
+# - pylint.extensions.magic_value
+# - pylint.extensions.while_used
+# as they seemed to get in the way.
+MASTER.load-plugins = [
+    "pylint.extensions.bad_builtin",
+    "pylint.extensions.comparison_placement",
+    "pylint.extensions.consider_refactoring_into_while_condition",
+    "pylint.extensions.docparams",
+    "pylint.extensions.dunder",
+    "pylint.extensions.eq_without_hash",
+    "pylint.extensions.for_any_all",
+    "pylint.extensions.mccabe",
+    "pylint.extensions.no_self_use",
+    "pylint.extensions.overlapping_exceptions",
+    "pylint.extensions.private_import",
+    "pylint.extensions.redefined_loop_name",
+    "pylint.extensions.redefined_variable_type",
+    "pylint.extensions.set_membership",
+    "pylint.extensions.typing",
+]
+# Pickle collected data for later comparisons.
+MASTER.persistent = true
+# Allow loading of arbitrary C extensions. Extensions are imported into the
+# active Python interpreter and may run arbitrary code.
+MASTER.unsafe-load-any-extension = false
+# Spelling dictionary name. Available dictionaries: none. To make it working
+# install python-enchant package.
+SPELLING.spelling-dict = "en_US"
+# A path to a file that contains private dictionary; one word per line.
+SPELLING.spelling-private-dict-file = "spelling_private_dict.txt"
+# Tells whether to store unknown words to indicated private dictionary in
+# --spelling-private-dict-file option instead of raising a message.
+SPELLING.spelling-store-unknown-words = "no"
+
+[tool.interrogate]
+fail-under = 100
+verbose = 2
+omit-covered-files = true
+
+[tool.check-manifest]
+ignore = [
+    "*.enc",
+    ".checkmake-config.ini",
+    ".git_archival.txt",
+    ".prettierrc",
+    ".vale.ini",
+    ".vscode/*.json",
+    ".yamlfmt",
+    "changelog",
+    "CHANGELOG.md",
+    "changelog/**",
+    "ci",
+    "ci/**",
+    "CODE_OF_CONDUCT.rst",
+    "CONTRIBUTING.rst",
+    "docs",
+    "docs/**",
+    "LICENSE",
+    "lint.mk",
+    "Makefile",
+    "newsfragments",
+    "newsfragments/**",
+    "prek.toml",
+    "readthedocs.yaml",
+    "sample",
+    "sample/**",
+    "spelling_private_dict.txt",
+    "styles/snapper/*.yml",
+    "tests",
+    "tests-pylintrc",
+    "tests/**",
+    "uv.lock",
+    "zizmor.yml",
+]
+
+[tool.vulture]
+# Duplicate some of .gitignore
+exclude = [ ".venv" ]
+# Ideally we would limit the paths to the source code where we want to ignore names,
+# but Vulture does not enable this.
+ignore_names = [
+    # Sphinx configuration
+    "autoclass_content",
+    "autoclass_content",
+    "autodoc_member_order",
+    # Sphinx and BeautifulSoup attributes read by their respective frameworks.
+    "exclude_patterns",
+    "extensions",
+    "final_argument_whitespace",
+    # pytest fixtures - we name fixtures like this for this purpose
+    "fixture_*",
+    "format",
+    # Sphinx variables
+    "has_content",
+    "html_show_copyright",
+    "html_show_sourcelink",
+    "html_show_sphinx",
+    "html_theme",
+    "html_theme_options",
+    "html_title",
+    "htmlhelp_basename",
+    "intersphinx_mapping",
+    "language",
+    "linkcheck_ignore",
+    "linkcheck_retries",
+    "master_doc",
+    "myst_enable_extensions",
+    "myst_substitutions",
+    "nitpicky",
+    "option_spec",
+    "optional_arguments",
+    "project",
+    "project_copyright",
+    "pygments_style",
+    # pytest configuration
+    "pytest_collect_file",
+    "pytest_plugins",
+    "required_arguments",
+    "rst_prolog",
+    "run",
+    "setup",
+    "source_suffix",
+    "spelling_word_list_filename",
+    "string",
+    "templates_path",
+    "warning_is_error",
+]
+
+[tool.pyproject-fmt]
+indent = 4
+keep_full_version = true
+max_supported_python = "3.15"
+
+[tool.mypy]
+files = [ "." ]
+exclude = [ "build" ]
+exclude_gitignore = true
+follow_untyped_imports = true
+strict = true
+plugins = [
+    "mypy_pytest_parametrize",
+    "mypy_strict_kwargs",
+]
+show_traceback = true
+num_workers = "auto"
+
+[tool.pyrefly]
+# Include the test package alongside the installed source package.
+search-path = [ "src", "." ]
+errors.non-exhaustive-match = "error"
+enabled-ignores = [ "pyrefly" ]
+preset = "all"
+
+[tool.pyright]
+typeCheckingMode = "strict"
+enableTypeIgnoreComments = false
+reportUnnecessaryTypeIgnoreComment = true
+
+[tool.ty]
+rules.all = "error"
+# Error if ty emits any warning-level diagnostics.
+terminal.error-on-warning = true
+# Disable support for `type: ignore` comments
+analysis.respect-type-ignore-comments = false
+analysis.strict-equality-semantics = true
+analysis.strict-generic-narrowing = true
+
+[tool.pytest]
+beartype_packages = [ "sphinx_section_include" ]
+beartype_test_fixtures = true
+beartype_tests = true
+log_cli = true
+xfail_strict = true
+
+[tool.coverage]
+run.source = [ "src/", "tests" ]
+# These scripts run separately in CI, outside pytest.
+run.omit = [ "tests/wheel_smoke.py" ]
+run.branch = true
+report.fail_under = 100
+report.exclude_also = [
+    "if TYPE_CHECKING:",
+]
+report.show_missing = true
+
+[tool.towncrier]
+# Write the same native Markdown file used by documentation and GitHub releases.
+directory = "newsfragments"
+filename = "changelog/{version}.md"
+title_format = "# {version} ({project_date})"
+issue_format = "[#{issue}](https://github.com/adamtheturtle/sphinx-section-include/issues/{issue})"
+single_file = false
+# Reject invalid fragment names instead of silently losing release entries.
+ignore = [ ".gitkeep" ]
+type = [ { directory = "change", name = "Changes", showcontent = true } ]
+
+[tool.pydocstringformatter]
+write = true
+split-summary-body = false
+max-line-length = 75
+linewrap-full-docstring = true
+
+[tool.doc8]
+max_line_length = 2000
+ignore_path = [
+    "./.eggs",
+    "./docs/build",
+    "./docs/build/spelling/output.txt",
+    "./node_modules",
+    "./sample/build",
+    "./src/*.egg-info/",
+    "./src/*/_setuptools_scm_version.txt",
+]
+
+[tool.yamlfix]
+section_whitelines = 1
+whitelines = 1
+
+[tool.no_defaults]
+private_only = true
+per_file_enforcement."tests/**" = "all"
+
+[tool.strict_kwargs]
+# Path methods are positional-only on Python 3.12; dirname is on 3.15.
+ignore_names = [
+    "pathlib.Path.relative_to",
+    "pathlib.Path.is_relative_to",
+    "pathlib.PurePath.relative_to",
+    "pathlib.PurePath.is_relative_to",
+    "posixpath.dirname",
+]
+
+[tool.mypy_strict_kwargs]
+ignore_names = [
+    "pathlib.Path.relative_to",
+    "pathlib.Path.is_relative_to",
+    "pathlib.PurePath.relative_to",
+    "pathlib.PurePath.is_relative_to",
+    "posixpath.dirname",
+]

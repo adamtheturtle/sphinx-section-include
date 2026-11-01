@@ -1,0 +1,77 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # Run at 1:00 every day
+    - cron: 0 1 * * *
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13', '3.14', '3.15']
+        uv-resolution: [highest, lowest-direct]
+        platform: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: '**/pyproject.toml'
+
+      - name: Build sample
+        run: |
+          uv run --group=dev sphinx-build -W -b html sample/source sample/build
+        env:
+          UV_PYTHON: ${{ matrix.python-version }}
+          UV_RESOLUTION: ${{ matrix.uv-resolution }}
+
+      - name: Build sample parallel
+        run: |
+          uv run --group=dev sphinx-build -j 2 -E -W -b html sample/source sample/build-parallel
+        env:
+          UV_PYTHON: ${{ matrix.python-version }}
+          UV_RESOLUTION: ${{ matrix.uv-resolution }}
+
+      - name: Run tests
+        run: |
+          uv run --group=dev pytest -s -vvv . --cov --cov-config=pyproject.toml
+        env:
+          UV_PYTHON: ${{ matrix.python-version }}
+          UV_RESOLUTION: ${{ matrix.uv-resolution }}
+
+      - name: Build distributions and test the installed wheel
+        run: |
+          uv build
+          uv run --group=release check-wheel-contents dist/*.whl
+          uv run --group=dev python tests/wheel_smoke.py
+        env:
+          UV_PYTHON: ${{ matrix.python-version }}
+          UV_RESOLUTION: ${{ matrix.uv-resolution }}
+
+  completion-ci:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Check matrix job status
+        run: |-
+          if ! ${{ needs.build.result == 'success' }}; then
+            echo "One or more CI jobs failed"
+            exit 1
+          fi
