@@ -28,7 +28,8 @@ def _prepare_nodes(
     container = nodes.container()
     container.extend(item=content)
     serial = directive.env.new_serialno(category="section-include")
-    prefix = f"section-include-{serial}-"
+    document_id = directive.env.docname.encode(encoding="utf-8").hex()
+    prefix = f"section-include-{document_id}-{serial}-"
     elements = list(container.findall(condition=nodes.Element))
     identities = {
         identity: prefix + identity

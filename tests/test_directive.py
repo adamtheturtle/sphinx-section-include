@@ -164,7 +164,13 @@ def test_repeated_inclusion_namespaces_targets(
         "nfiguration\n   :include-heading:\n\n"
     )
     source = tmp_path / "source"
-    write_project(root=source, directive=directive + directive)
+    inclusion_count = 2
+    write_project(root=source, directive=directive * inclusion_count)
+    _ = (source / "second.rst").write_text(
+        data="Second page\n===========\n\n" + directive
+    )
+    index = source / "index.rst"
+    _ = index.write_text(data=index.read_text() + "   second\n")
     app = make_app(srcdir=source, exception_on_warning=True)
     app.build()
     assert app.warning.getvalue() == ""
@@ -174,13 +180,24 @@ def test_repeated_inclusion_namespaces_targets(
     )
     ids = [node["id"] for node in soup.select(selector="[id]")]
     assert len(ids) == len(set(ids))
-    for number in (0, 1):
-        assert (
-            soup.select_one(
-                selector=f"#section-include-{number}-configuration"
-            )
-            is not None
-        )
+    assert (
+        len(soup.select(selector="[id$='-configuration']")) == inclusion_count
+    )
+    second = BeautifulSoup(
+        markup=(Path(app.outdir) / "second.html").read_text(),
+        features="html.parser",
+    )
+    first_ids = {
+        str(object=node["id"])
+        for node in soup.select(selector="[id^='section-include-']")
+    }
+    second_ids = {
+        str(object=node["id"])
+        for node in second.select(selector="[id^='section-include-']")
+    }
+    assert bool(first_ids)
+    assert bool(second_ids)
+    assert first_ids.isdisjoint(second_ids)
 
 
 def test_exclusions_and_incremental_dependencies(
