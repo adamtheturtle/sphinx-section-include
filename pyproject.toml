@@ -267,6 +267,7 @@ ignore = [
     ".vale.ini",
     ".vscode/*.json",
     ".yamlfmt",
+    "API.rst",
     "changelog",
     "CHANGELOG.md",
     "changelog/**",
@@ -444,6 +445,8 @@ per_file_enforcement."tests/**" = "all"
 [tool.strict_kwargs]
 # Path methods are positional-only on Python 3.12; dirname is on 3.15.
 ignore_names = [
+    # ContextVar requires a positional name on supported Python versions.
+    "contextvars.ContextVar",
     "pathlib.Path.relative_to",
     "pathlib.Path.is_relative_to",
     "pathlib.PurePath.relative_to",
@@ -453,6 +456,8 @@ ignore_names = [
 
 [tool.mypy_strict_kwargs]
 ignore_names = [
+    # ContextVar requires a positional name on supported Python versions.
+    "_contextvars.ContextVar",
     "pathlib.Path.relative_to",
     "pathlib.Path.is_relative_to",
     "pathlib.PurePath.relative_to",

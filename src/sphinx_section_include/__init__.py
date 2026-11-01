@@ -8,7 +8,11 @@ from sphinx_section_include.directive import (
     IncludeSection,
     resolve_included_references,
 )
-from sphinx_section_include.reader import read_document, resolve_source
+from sphinx_section_include.reader import (
+    read_document,
+    resolve_source,
+    section_source,
+)
 from sphinx_section_include.sections import (
     copy_section,
     find_sections,
@@ -20,6 +24,7 @@ __all__ = [
     "find_sections",
     "read_document",
     "resolve_source",
+    "section_source",
     "select_section",
 ]
 __version__ = version(distribution_name="sphinx-section-include")

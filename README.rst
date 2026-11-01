@@ -31,6 +31,8 @@ Omit ``:include-heading:`` to include only the section's contents.
 ``:exclude-sections:`` accepts one descendant selector per line.
 Paths are relative to the including document, or to the Sphinx source directory when prefixed with ``/``.
 
+Extension authors can reuse parsed sources through the `Python API <./API.rst>`_.
+
 See the `examples <https://github.com/adamtheturtle/sphinx-section-include/tree/main/sample/source>`_ and `contributor guide <https://github.com/adamtheturtle/sphinx-section-include/blob/main/CONTRIBUTING.rst>`_.
 
 .. |Build Status| image:: https://github.com/adamtheturtle/sphinx-section-include/actions/workflows/ci.yml/badge.svg?branch=main

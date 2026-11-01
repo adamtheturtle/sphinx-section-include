@@ -1,6 +1,10 @@
 """Read source documents through the active Sphinx directive context."""
 
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import copy
+from dataclasses import dataclass
 from pathlib import Path
 
 from docutils import nodes
@@ -15,8 +19,64 @@ from docutils.transforms.references import (
     Substitutions,
 )
 from docutils.utils import new_document
+from sphinx.environment import BuildEnvironment
 from sphinx.transforms import DefaultSubstitutions
 from sphinx.util.docutils import LoggingReporter, SphinxDirective
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Source:
+    """One prepared source, scoped to its consuming document."""
+
+    environment: BuildEnvironment
+    docname: str
+    parsing_docname: str
+    path: Path
+    document: nodes.document
+
+
+_sources: ContextVar[tuple[_Source, ...]] = ContextVar(
+    "section_sources", default=()
+)
+
+
+@contextmanager
+def section_source(
+    *, directive: SphinxDirective, source: str, docname: str | None = None
+) -> Generator[nodes.document]:
+    """Share one parsed source with includes executed inside this context.
+
+    The yielded document may be prepared before parsing the including content.
+    Only this environment and consuming document reuse it. Leaving the context,
+    including after an exception, restores any surrounding source context.
+    Nothing is retained between builds or template contexts.
+    """
+    path = resolve_source(directive=directive, source=source)
+    document = read_document(
+        directive=directive, source=source, docname=docname
+    )
+    token = _sources.set(
+        (
+            *_sources.get(),
+            _Source(
+                environment=directive.env,
+                docname=directive.env.docname,
+                parsing_docname=(
+                    path.relative_to(Path(directive.env.srcdir).resolve())
+                    .with_suffix(suffix="")
+                    .as_posix()
+                    if docname is None
+                    else docname
+                ),
+                path=path,
+                document=document,
+            ),
+        )
+    )
+    try:
+        yield document
+    finally:
+        _sources.reset(token)
 
 
 def resolve_source(*, directive: SphinxDirective, source: str) -> Path:
@@ -59,6 +119,15 @@ def read_document(
     if str(object=path) in ancestors:
         message = f"Circular section include involving {path.name!r}"
         raise ValueError(message)
+    for prepared in reversed(_sources.get()):
+        if (
+            prepared.environment is directive.env
+            and prepared.docname == directive.env.docname
+            and prepared.path == path
+            and (docname is None or docname == prepared.parsing_docname)
+        ):
+            directive.env.note_dependency(filename=path)
+            return prepared.document
     settings = copy(x=parent.settings)
     document = new_document(
         source_path=str(
