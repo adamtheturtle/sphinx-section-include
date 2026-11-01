@@ -32,7 +32,9 @@ jobs:
         uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
-          cache-dependency-glob: '**/pyproject.toml'
+          cache-dependency-glob: |-
+            **/pyproject.toml
+            uv.lock
 
       - name: Lint
         uses: j178/prek-action@v3.1.0

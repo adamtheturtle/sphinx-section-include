@@ -12,7 +12,11 @@ Install Python dependencies in a virtual environment.
 
 .. code-block:: shell
 
-   uv sync --group=dev
+   uv sync --locked --group=dev
+
+The committed ``uv.lock`` records the development and release dependencies.
+Update it with ``uv lock`` when changing dependencies.
+CI also resolves the lowest direct dependencies across its supported platforms.
 
 Spell checking requires ``enchant``.
 This can be installed on macOS, for example, with `Homebrew`_:
