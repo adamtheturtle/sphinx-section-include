@@ -174,3 +174,50 @@ Nested section includes prepare their source documents before copying them into 
 The callback later sees those copied descendants when preparing the parent's assembled tree, so transformations over descendants should be idempotent.
 Your callback supplies presentation and validation rules.
 RST path validation, dependency tracking, and circular-include checks still apply.
+
+Scoped excerpt validation
+-------------------------
+
+Use ``validate_sections`` to check each copied ``include-section`` result against a caller-owned rule:
+
+.. code-block:: python
+
+   """Validate excerpts while parsing a composition."""
+
+   from collections.abc import Sequence
+
+   from docutils import nodes
+   from sphinx.util.docutils import SphinxDirective
+
+   from sphinx_section_include import validate_sections
+
+   __all__ = ["render_checked"]
+
+
+   def require_text(content: Sequence[nodes.Node], /) -> None:
+       """Apply this consumer's requirement that excerpts contain text."""
+       if not any(node.astext().strip() for node in content):
+           message = "Excerpt must contain text"
+           raise ValueError(message)
+
+
+   def render_checked(*, directive: SphinxDirective) -> list[nodes.Node]:
+       """Validate ordinary section includes within this composition."""
+       container = nodes.container()
+       with validate_sections(directive=directive, validate=require_text):
+           _ = directive.state.nested_parse(
+               block=directive.content,
+               input_offset=directive.content_offset,
+               node=container,
+           )
+       return container.children
+
+The callback receives a sequence of copied nodes after exclusions and heading conversion, before target registration.
+Inspect the nodes without mutating them.
+Raise ``ValueError`` to reject an excerpt with a normal directive diagnostic and source location.
+The library supplies no default content rule.
+
+Validation runs for every include within the selected Sphinx environment and context lifetime, even when includes reuse one prepared source.
+Nested scopes replace their environment's outer validator and restore it after success or failure.
+Other environments and includes outside the scope are unaffected.
+Direct calls to ``copy_section`` do not invoke scoped validators.

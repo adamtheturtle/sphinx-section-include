@@ -18,6 +18,7 @@ from sphinx.util.docutils import SphinxDirective
 
 from sphinx_section_include.reader import read_document, resolve_source
 from sphinx_section_include.sections import copy_section, select_section
+from sphinx_section_include.validation import validate_content
 
 
 def _prepare_nodes(
@@ -305,6 +306,7 @@ class IncludeSection(SphinxDirective):
                 exclude_sections=excluded,
                 heading_style=self.options.get("heading-style", "section"),
             )
+            validate_content(directive=self, content=content)
             return _prepare_nodes(
                 directive=self,
                 content=content,
