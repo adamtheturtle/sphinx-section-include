@@ -58,6 +58,30 @@ For example:
 Every exclusion must resolve to exactly one descendant.
 The Python ``copy_section`` function accepts these already-resolved nodes in ``exclude_sections``.
 
+Heading presentation
+--------------------
+
+By default, included headings remain ordinary document sections.
+Use ``:heading-style: rubric`` to turn every included section heading into a Docutils rubric: an informal heading outside the document's section hierarchy and table of contents.
+This is useful for excerpts inside disclosures, admonitions, or other containers.
+
+.. code-block:: rst
+
+   .. include-section:: manual.rst
+      :section: Configuration
+      :include-heading:
+      :heading-style: rubric
+
+``:include-heading:`` still controls whether the selected section's own heading appears.
+Descendant headings use the chosen style whether or not that heading is included.
+Rubric mode preserves inline heading formatting, target IDs and names, source locations, and references without changing the source document.
+Both styles use native Docutils nodes and work with HTML and non-HTML builders.
+The only supported styles are ``section`` and ``rubric``.
+
+The Python API accepts ``copy_section(section=section, heading_style="rubric")`` with the same behavior.
+Copying never registers targets in the source document.
+The directive prefixes copied targets and registers them in the consuming document after applying the selected heading style.
+
 Preparing a source once
 -----------------------
 

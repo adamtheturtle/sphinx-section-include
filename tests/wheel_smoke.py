@@ -65,6 +65,7 @@ def main() -> None:
         output = (temp / "output/quickstart.html").read_text(encoding="utf-8")
         assert "Create a widget with a name." in output
         assert "Use a descriptive widget name." in output
+        assert 'class="rubric"' in output
         print("Installed-wheel build passed outside the checkout.")
 
 

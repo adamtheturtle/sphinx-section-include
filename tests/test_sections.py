@@ -1,5 +1,7 @@
 """Selection and copying preserve parsed document semantics."""
 
+from typing import Literal
+
 import pytest
 from docutils import nodes
 from docutils.core import publish_doctree
@@ -152,7 +154,12 @@ def test_invalid_selection_modes(
 
 
 @pytest.mark.parametrize(argnames="include_heading", argvalues=[False, True])
-def test_copy_is_independent(*, include_heading: bool) -> None:
+@pytest.mark.parametrize(
+    argnames="heading_style", argvalues=["section", "rubric"]
+)
+def test_copy_is_independent(
+    *, include_heading: bool, heading_style: Literal["section", "rubric"]
+) -> None:
     """Copying keeps node structure, anchors, and metadata without
     mutation.
     """
@@ -165,24 +172,38 @@ def test_copy_is_independent(*, include_heading: bool) -> None:
         section=part,
         include_heading=include_heading,
         exclude_sections=(details, details),
+        heading_style=heading_style,
     )
     container = nodes.container()
     container.extend(item=content)
     assert "Nested details." not in container.astext()
     assert "A literal slash heading." in container.astext()
     assert part.pformat() == original
+    heading_type = nodes.rubric if heading_style == "rubric" else nodes.section
     assert all(
         node.source == "original.rst"
-        for node in container.findall(condition=nodes.section)
+        for node in container.findall(condition=heading_type)
     )
+    if heading_style == "rubric":
+        assert not bool(list(container.findall(condition=nodes.section)))
+        assert [
+            node.astext() for node in container.findall(condition=nodes.rubric)
+        ] == [
+            *(["First"] if include_heading else []),
+            "Brief",
+            "Brief / Details",
+            "Deep / nested",
+            "#stable-brief",
+        ]
     if include_heading:
-        assert isinstance(content[0], nodes.section)
+        assert isinstance(content[0], heading_type)
         assert content[0]["ids"] == part["ids"]
     else:
         assert (
-            next(container.findall(condition=nodes.section))[0].astext()
-            == "Brief"
-        )
+            next(container.findall(condition=nodes.rubric)).astext()
+            if heading_style == "rubric"
+            else next(container.findall(condition=nodes.section))[0].astext()
+        ) == "Brief"
     assert not any(
         node is brief for node in container.findall(condition=nodes.section)
     )
@@ -202,3 +223,37 @@ def test_exclusions_require_descendants(*, selector: str) -> None:
         _ = copy_section(
             section=part, include_heading=True, exclude_sections=(excluded,)
         )
+
+
+def test_rubrics_preserve_heading_markup_targets_and_locations() -> None:
+    """Flatten copied headings without losing inline markup or targets."""
+    doc = publish_doctree(
+        source=(
+            "Manual\n======\n\nPart *one*\n----------\n\nContent.\n\n"
+            "Another part\n------------\n\nOther content.\n"
+        ),
+        source_path="original.rst",
+    )
+    part = select_section(document=doc, title="Part one")
+    title = part[0]
+    assert isinstance(title, nodes.title)
+    title["ids"] = ["title-id"]
+    title["names"] = ["title-name"]
+    title["classes"] = ["title-class"]
+    title["backrefs"] = ["title-backref"]
+    part["classes"] = ["section-class"]
+    part["backrefs"] = ["section-backref"]
+    original = doc.pformat()
+    (rubric, body) = copy_section(section=part, heading_style="rubric")
+    assert isinstance(rubric, nodes.rubric)
+    assert rubric.astext() == "Part one"
+    assert len(list(rubric.findall(condition=nodes.emphasis))) == 1
+    assert rubric["ids"] == [*part["ids"], "title-id"]
+    assert rubric["names"] == [*part["names"], "title-name"]
+    assert rubric["classes"] == ["section-class", "title-class"]
+    assert rubric["backrefs"] == ["section-backref", "title-backref"]
+    assert rubric.rawsource == title.rawsource
+    assert rubric.source == title.source == "original.rst"
+    assert rubric.line == title.line
+    assert body.astext() == "Content."
+    assert doc.pformat() == original

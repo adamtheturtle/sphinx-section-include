@@ -6,6 +6,7 @@ import base64
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from bs4 import BeautifulSoup
@@ -87,17 +88,22 @@ def write_project(*, root: Path, directive: str) -> None:
     argnames="buildername", argvalues=["html", "dirhtml", "text", "latex"]
 )
 @pytest.mark.parametrize(argnames="include_heading", argvalues=[False, True])
+@pytest.mark.parametrize(
+    argnames="heading_style", argvalues=["section", "rubric"]
+)
 def test_include_preserves_content_and_links(
     *,
     make_app: Callable[..., SphinxTestApp],
     tmp_path: Path,
     buildername: str,
     include_heading: bool,
+    heading_style: Literal["section", "rubric"],
 ) -> None:
     """Included content, references, and resources retain their origin."""
     directive = (
         ".. include-section:: manual/source.rst\n"
         "   :section-path:\n      Parent\n      Configuration\n"
+        f"   :heading-style: {heading_style}\n"
     )
     if include_heading:
         directive += "   :include-heading:\n"
@@ -112,9 +118,23 @@ def test_include_preserves_content_and_links(
     tree = app.env.get_doctree(docname="overview")
     assert "Included instructions." in tree.astext()
     assert "Other source content." not in tree.astext()
-    assert len(list(tree.findall(condition=nodes.section))) == (
-        3 if include_heading else 2
-    )
+    if heading_style == "rubric":
+        assert len(list(tree.findall(condition=nodes.section))) == 1
+        rubrics = list(tree.findall(condition=nodes.rubric))
+        assert [node.astext() for node in rubrics] == (
+            ["Configuration", "Details"] if include_heading else ["Details"]
+        )
+        assert "Details" not in app.env.tocs["overview"].astext()
+        for rubric in rubrics:
+            assert rubric.source is not None
+            assert rubric.source.endswith("manual/source.rst")
+            assert rubric.line is not None
+            for identity in rubric["ids"]:
+                assert tree.ids[identity] is rubric
+    else:
+        assert len(list(tree.findall(condition=nodes.section))) == (
+            3 if include_heading else 2
+        )
     if buildername in {"html", "dirhtml"}:
         filename = (
             "overview.html" if buildername == "html" else "overview/index.html"
@@ -130,6 +150,10 @@ def test_include_preserves_content_and_links(
             for a in content.select(selector="a[href]")
         }
         assert links["Details"].startswith("#section-include-")
+        assert soup.find(id=links["Details"][1:]) is not None
+        if include_heading:
+            assert links["Configuration"].startswith("#section-include-")
+            assert soup.find(id=links["Configuration"][1:]) is not None
         assert links["Outside"] == (
             "manual/source.html#outside"
             if buildername == "html"
@@ -169,13 +193,21 @@ def test_include_preserves_content_and_links(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    argnames="heading_style", argvalues=["section", "rubric"]
+)
 def test_repeated_inclusion_namespaces_targets(
-    *, make_app: Callable[..., SphinxTestApp], tmp_path: Path, parallel: int
+    *,
+    make_app: Callable[..., SphinxTestApp],
+    tmp_path: Path,
+    parallel: int,
+    heading_style: Literal["section", "rubric"],
 ) -> None:
     """Serial and parallel readers retain separate excerpt anchors."""
     directive = (
         ".. include-section:: manual/source.rst\n   :section-label: co"
-        "nfiguration\n   :include-heading:\n\n"
+        "nfiguration\n   :include-heading:\n"
+        f"   :heading-style: {heading_style}\n\n"
     )
     source = tmp_path / "source"
     inclusion_count = 2
@@ -253,6 +285,16 @@ def test_exclusions_and_incremental_dependencies(
         ("overview.rst", ":section: Overview", "cannot include itself"),
         ("missing.rst", ":section: Parent", "does not exist"),
         ("manual/source.rst", "", "requires exactly one"),
+        (
+            "manual/source.rst",
+            ":section: Parent\n:heading-style: paragraph",
+            "invalid option value",
+        ),
+        (
+            "manual/source.rst",
+            ":section: Parent\n:heading-style:",
+            "invalid option value",
+        ),
         (
             "manual/source.rst",
             ":section: Parent\n:section-label: configuration",
