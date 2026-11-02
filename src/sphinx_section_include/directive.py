@@ -1,9 +1,10 @@
 """Expose parsed section inclusion as a Sphinx directive."""
 
+import json
 import posixpath
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, TypeGuard, override
 from urllib.parse import urlsplit
 
 from docutils import nodes
@@ -183,6 +184,53 @@ def resolve_included_references(
             reference["refuri"] = parsed._replace(path=path).geturl()
 
 
+def _heading_path(argument: str | None, /) -> tuple[str, ...]:
+    """Read one literal heading component per physical option line."""
+    value = argument if argument is not None else ""
+    if not bool(value.strip()):
+        message = "Section path option must not be empty"
+        raise ValueError(message)
+    return tuple(line.strip() for line in value.strip().splitlines())
+
+
+def _is_json_array(value: object, /) -> TypeGuard[list[object]]:
+    """Narrow JSON arrays without assuming element types."""
+    return isinstance(value, list)
+
+
+def _excluded_paths(argument: str | None, /) -> tuple[tuple[str, ...], ...]:
+    """Read one JSON array per excluded heading path."""
+    value = argument if argument is not None else ""
+    if not bool(value.strip()):
+        message = "Section path option must not be empty"
+        raise ValueError(message)
+    paths: list[tuple[str, ...]] = []
+    for line in value.strip().splitlines():
+        decoded: object = json.loads(s=line)
+        if _is_json_array(decoded):
+            components: list[object] = decoded
+        else:
+            message = (
+                "Each excluded section path must be a JSON array "
+                "of nonempty strings"
+            )
+            raise TypeError(message)
+        path: list[str] = []
+        for component in components:
+            if not isinstance(component, str) or not bool(component.strip()):
+                message = (
+                    "Each excluded section path must be a JSON array "
+                    "of nonempty strings"
+                )
+                raise ValueError(message)
+            path.append(component)
+        if not bool(path):
+            message = "Excluded section paths must not be empty"
+            raise ValueError(message)
+        paths.append(tuple(path))
+    return tuple(paths)
+
+
 class IncludeSection(SphinxDirective):
     """Include one exact section while preserving its document
     structure.
@@ -191,8 +239,12 @@ class IncludeSection(SphinxDirective):
     required_arguments = 1
     option_spec: ClassVar[dict[str, Callable[[str], Any]] | None] = {  # pyrefly: ignore[explicit-any]
         "section": directives.unchanged_required,
+        "section-path": _heading_path,
+        "section-label": directives.unchanged_required,
         "include-heading": directives.flag,
         "exclude-sections": directives.unchanged_required,
+        "exclude-section-paths": _excluded_paths,
+        "exclude-section-labels": directives.unchanged_required,
     }
 
     @override
@@ -200,20 +252,47 @@ class IncludeSection(SphinxDirective):
         """Read, select, and copy a section without rendering it to
         HTML.
         """
-        if "section" not in self.options:
-            raise self.error(message="include-section requires :section:")
+        if (
+            sum(
+                name in self.options
+                for name in ("section", "section-path", "section-label")
+            )
+            != 1
+        ):
+            raise self.error(
+                message=(
+                    "include-section requires exactly one of :section:, "
+                    ":section-path:, or :section-label:"
+                )
+            )
         try:
             path = resolve_source(directive=self, source=self.arguments[0])
             document = read_document(directive=self, source=self.arguments[0])
             selected = select_section(
-                document=document, selector=self.options["section"]
+                document=document,
+                title=self.options.get("section"),
+                path=self.options.get("section-path"),
+                label=self.options.get("section-label"),
             )
-            excluded = tuple(
-                select_section(document=selected, selector=selector.strip())
-                for selector in self.options.get(
-                    "exclude-sections", ""
-                ).splitlines()
-                if bool(selector.strip())
+            excluded = (
+                tuple(
+                    select_section(document=selected, title=title.strip())
+                    for title in self.options.get(
+                        "exclude-sections", ""
+                    ).splitlines()
+                    if bool(title.strip())
+                )
+                + tuple(
+                    select_section(document=selected, label=label.strip())
+                    for label in self.options.get(
+                        "exclude-section-labels", ""
+                    ).splitlines()
+                    if bool(label.strip())
+                )
+                + tuple(
+                    select_section(document=selected, path=path)
+                    for path in self.options.get("exclude-section-paths", ())
+                )
             )
             content = copy_section(
                 section=selected,

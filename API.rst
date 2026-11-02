@@ -5,6 +5,59 @@ Extension API
 ``find_sections`` and ``select_section`` select headings, heading paths, or labels.
 ``copy_section`` copies a selection without changing its source tree.
 
+Explicit section selection
+--------------------------
+
+Pass exactly one of ``title``, ``path``, or ``label`` to ``find_sections`` or ``select_section``.
+For example, ``select_section(document=document, title="Input / output")`` selects that literal heading, while ``path=("Q1", "Input / output")`` selects it directly beneath ``Q1``.
+``label="stable-prompt"`` selects the section carrying that RST label, using Docutils name normalization.
+Titles and path components are exact, case-sensitive text.
+``/`` and ``#`` have no special meaning.
+The first path component may occur at any depth in the supplied document or section.
+Later components must be direct child headings.
+``find_sections`` returns all matches.
+``select_section`` rejects missing or ambiguous matches.
+An empty selector, or more than one mode, is an error.
+
+The directive uses exactly one corresponding option:
+
+.. code-block:: rst
+
+   .. include-section:: manual.rst
+      :section-path:
+         Q1
+         Input / output
+
+Use ``:section: Input / output`` to select the literal heading anywhere in the source, or ``:section-label: stable-prompt`` for a label.
+Do not prefix labels with ``#``.
+
+Exclusions
+----------
+
+Exclusions must be descendants of the selected section.
+These options can be combined:
+
+* ``:exclude-sections:`` lists one literal heading per line.
+* ``:exclude-section-labels:`` lists one RST label per line.
+* ``:exclude-section-paths:`` lists one JSON array of literal heading components per line.
+
+For example:
+
+.. code-block:: rst
+
+   .. include-section:: manual.rst
+      :section: Q1
+      :exclude-sections:
+         Input / output
+         #Examples
+      :exclude-section-labels: internal-details
+      :exclude-section-paths:
+         ["Prompt", "Follow up questions"]
+         ["Discussion / API", "Examples"]
+
+Every exclusion must resolve to exactly one descendant.
+The Python ``copy_section`` function accepts these already-resolved nodes in ``exclude_sections``.
+
 Preparing a source once
 -----------------------
 

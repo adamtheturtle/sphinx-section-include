@@ -22,13 +22,17 @@ Include a section:
 .. code-block:: rst
 
    .. include-section:: manual.rst
-      :section: Getting started / Configuration
+      :section-path:
+         Getting started
+         Configuration
       :include-heading:
       :exclude-sections: Advanced configuration
 
-Select by exact heading, heading path, or ``#label``.
+Use ``:section:`` for a literal heading, ``:section-path:`` for one heading per line, or ``:section-label:`` for an RST label.
+Slashes and hashes in headings are always literal.
 Omit ``:include-heading:`` to include only the section's contents.
-``:exclude-sections:`` accepts one descendant selector per line.
+``:exclude-sections:`` accepts one literal descendant heading per line.
+See the `selection reference <https://github.com/adamtheturtle/sphinx-section-include/blob/main/API.rst>`_ for path and label exclusions.
 Paths are relative to the including document, or to the Sphinx source directory when prefixed with ``/``.
 
 Extension authors can reuse parsed sources through the `Python API <https://github.com/adamtheturtle/sphinx-section-include/blob/main/API.rst>`_.

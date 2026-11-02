@@ -97,7 +97,7 @@ def test_include_preserves_content_and_links(
     """Included content, references, and resources retain their origin."""
     directive = (
         ".. include-section:: manual/source.rst\n"
-        "   :section: Parent / Configuration\n"
+        "   :section-path:\n      Parent\n      Configuration\n"
     )
     if include_heading:
         directive += "   :include-heading:\n"
@@ -174,7 +174,7 @@ def test_repeated_inclusion_namespaces_targets(
 ) -> None:
     """Serial and parallel readers retain separate excerpt anchors."""
     directive = (
-        ".. include-section:: manual/source.rst\n   :section: #co"
+        ".. include-section:: manual/source.rst\n   :section-label: co"
         "nfiguration\n   :include-heading:\n\n"
     )
     source = tmp_path / "source"
@@ -224,7 +224,7 @@ def test_exclusions_and_incremental_dependencies(
     write_project(
         root=source,
         directive=(
-            ".. include-section:: manual/source.rst\n   :section: #co"
+            ".. include-section:: manual/source.rst\n   :section-label: co"
             "nfiguration\n   :exclude-sections: Details\n"
         ),
     )
@@ -252,16 +252,50 @@ def test_exclusions_and_incremental_dependencies(
         ),
         ("overview.rst", ":section: Overview", "cannot include itself"),
         ("missing.rst", ":section: Parent", "does not exist"),
-        ("manual/source.rst", "", "requires :section:"),
-        ("manual/source.rst", ":section: Missing", "Expected one section"),
+        ("manual/source.rst", "", "requires exactly one"),
         (
             "manual/source.rst",
-            ":section: #configuration\n:exclude-sections: Missing",
+            ":section: Parent\n:section-label: configuration",
+            "requires exactly one",
+        ),
+        (
+            "manual/source.rst",
+            ":section: Parent\n:section-path: Parent",
+            "requires exactly one",
+        ),
+        (
+            "manual/source.rst",
+            ":section-label: configuration\n:section-path: Parent",
+            "requires exactly one",
+        ),
+        ("manual/source.rst", ":section-path:", "invalid option value"),
+        (
+            "manual/source.rst",
+            ":section: Parent / Configuration",
             "Expected one section",
         ),
         (
             "manual/source.rst",
-            ":section: #configuration\n:exclude-sections: #configuration",
+            ":section: #configuration",
+            "Expected one section",
+        ),
+        (
+            "manual/source.rst",
+            ":section-label: #configuration",
+            "Expected one section",
+        ),
+        ("manual/source.rst", ":section: Missing", "Expected one section"),
+        (
+            "manual/source.rst",
+            ":section-label: configuration\n:exclude-sections: Missing",
+            "Expected one section",
+        ),
+        (
+            "manual/source.rst",
+            (
+                ":section-label: configuration\n"
+                ":exclude-section-labels: configuration"
+            ),
             "must be descendants",
         ),
     ],
@@ -320,7 +354,7 @@ def test_external_resources_and_cross_references(
         root=source,
         directive=(
             ".. include-section:: manual/source.rst\n"
-            "   :section: #configuration\n"
+            "   :section-label: configuration\n"
         ),
     )
     path = source / "manual/source.rst"
@@ -359,7 +393,7 @@ def test_builder_without_document_uris(
         root=source,
         directive=(
             ".. include-section:: manual/source.rst\n"
-            "   :section: #configuration\n"
+            "   :section-label: configuration\n"
         ),
     )
     app = make_app(srcdir=source, exception_on_warning=True)
@@ -392,7 +426,7 @@ def test_nested_excerpts_keep_their_reference_origins(
         root=source,
         directive=(
             ".. include-section:: manual/source.rst\n"
-            "   :section: Parent / Configuration\n"
+            "   :section-path:\n      Parent\n      Configuration\n"
         ),
     )
     _ = (source / "manual/other.rst").write_text(
@@ -416,3 +450,144 @@ def test_nested_excerpts_keep_their_reference_origins(
     assert 'href="manual/assets/"' in html
     assert "Neighboring content." not in html
     assert app.warning.getvalue() == ""
+
+
+COLLIDING_SECTIONS = """\
+Selectors
+=========
+
+Root / API
+----------
+
+A
+~
+
+.. _chosen:
+
+B
+^
+
+Nested marker.
+
+A / B
+~~~~~
+
+Literal marker.
+
+Child / leaf
+^^^^^^^^^^^^
+
+Child marker.
+
+#chosen
+~~~~~~~
+
+Hash marker.
+"""
+
+
+@pytest.mark.parametrize(
+    argnames=("options", "present", "absent"),
+    argvalues=[
+        (":section: A / B", "Literal marker.", "Nested marker."),
+        (":section: #chosen", "Hash marker.", "Nested marker."),
+        (":section-label: chosen", "Nested marker.", "Hash marker."),
+        (
+            ":section-path:\n   Root / API\n   A\n   B",
+            "Nested marker.",
+            "Literal marker.",
+        ),
+        (
+            ":section-path:\n   Root / API\n   A / B\n   Child / leaf",
+            "Child marker.",
+            "Literal marker.",
+        ),
+        (
+            ":section: Root / API\n:exclude-sections:\n   A / B\n   #chosen",
+            "Nested marker.",
+            "Literal marker.",
+        ),
+        (
+            ":section: Root / API\n:exclude-section-labels: chosen",
+            "Hash marker.",
+            "Nested marker.",
+        ),
+        (
+            (
+                ":section: Root / API\n:exclude-section-paths:\n"
+                '   ["A", "B"]\n   ["A / B", "Child / leaf"]'
+            ),
+            "Literal marker.",
+            "Nested marker.",
+        ),
+        (
+            (
+                ":section: Root / API\n:exclude-sections: #chosen\n"
+                ":exclude-section-labels: chosen\n"
+                ':exclude-section-paths: ["A / B", "Child / leaf"]'
+            ),
+            "Literal marker.",
+            "Child marker.",
+        ),
+    ],
+)
+def test_colliding_titles_paths_and_labels(
+    *,
+    make_app: Callable[..., SphinxTestApp],
+    tmp_path: Path,
+    options: str,
+    present: str,
+    absent: str,
+) -> None:
+    """Explicit inclusion and exclusion modes retain their own meaning."""
+    source = tmp_path / "source"
+    directive = ".. include-section:: manual/source.rst\n" + "".join(
+        "   " + line + "\n" for line in options.splitlines()
+    )
+    write_project(root=source, directive=directive)
+    _ = (source / "manual/source.rst").write_text(data=COLLIDING_SECTIONS)
+    app = make_app(srcdir=source, exception_on_warning=True)
+    app.build()
+    text = app.env.get_doctree(docname="overview").astext()
+    assert present in text
+    assert absent not in text
+    if "exclude-section-paths" in options:
+        assert "Child marker." not in text
+    if "exclude-sections" in options:
+        assert "Hash marker." not in text
+    assert app.warning.getvalue() == ""
+
+
+@pytest.mark.parametrize(
+    argnames="value",
+    argvalues=[
+        "",
+        "not-json",
+        '"Parent"',
+        "{}",
+        "[]",
+        '["Parent", 1]',
+        '["Parent", " "]',
+    ],
+)
+def test_invalid_excluded_paths_report_errors(
+    *,
+    make_app: Callable[..., SphinxTestApp],
+    tmp_path: Path,
+    value: str,
+) -> None:
+    """Malformed paths fail rather than becoming literal title
+    selectors.
+    """
+    source = tmp_path / "source"
+    write_project(
+        root=source,
+        directive=(
+            ".. include-section:: manual/source.rst\n"
+            "   :section: Parent\n"
+            f"   :exclude-section-paths: {value}\n"
+        ),
+    )
+    app = make_app(srcdir=source)
+    app.build()
+    assert "invalid option value" in app.warning.getvalue()

@@ -2,5 +2,5 @@ Quick start
 ===========
 
 .. include-section:: chapters/source.rst
-   :section: #widget-configuration
+   :section-label: widget-configuration
    :include-heading:
