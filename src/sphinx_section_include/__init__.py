@@ -3,6 +3,7 @@
 from importlib.metadata import version
 
 from sphinx.application import Sphinx
+from sphinx.util.typing import ExtensionMetadata
 
 from sphinx_section_include.directive import (
     IncludeSection,
@@ -30,7 +31,7 @@ __all__ = [
 __version__ = version(distribution_name="sphinx-section-include")
 
 
-def setup(app: Sphinx) -> dict[str, object]:
+def setup(app: Sphinx) -> ExtensionMetadata:
     """Register the directive and builder-independent reference
     handling.
     """
