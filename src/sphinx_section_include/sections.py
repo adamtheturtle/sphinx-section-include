@@ -6,47 +6,75 @@ from docutils import nodes
 
 
 def find_sections(
-    *, document: nodes.document | nodes.section, selector: str
+    *,
+    document: nodes.document | nodes.section,
+    title: str | None = None,
+    path: tuple[str, ...] | None = None,
+    label: str | None = None,
 ) -> list[nodes.section]:
-    """Find literal headings, heading paths, or standard RST labels.
+    """Find sections using exactly one explicit selection mode.
 
-    Literal headings take precedence over path or label syntax.
+    Titles and path components are literal text, including slash and hash
+    characters. Labels use Docutils' native name normalization.
     """
+    if sum(value is not None for value in (title, path, label)) != 1:
+        message = "Specify exactly one of title, path, or label"
+        raise ValueError(message)
     sections = list(document.findall(condition=nodes.section))
-    literal = [
-        section for section in sections if section[0].astext() == selector
-    ]
-    if bool(literal):
-        return literal
-    if selector.startswith("#"):
-        label = nodes.fully_normalize_name(name=selector[1:])
+    if title is not None:
+        if not bool(title.strip()):
+            message = "Section title must not be empty"
+            raise ValueError(message)
+        return [
+            section for section in sections if section[0].astext() == title
+        ]
+    if label is not None:
+        if not bool(label.strip()):
+            message = "Section label must not be empty"
+            raise ValueError(message)
+        name = nodes.fully_normalize_name(name=label)
         return [
             section
             for section in sections
-            if label in section["names"] or label in section["ids"]
+            if name in section["names"] or name in section["ids"]
         ]
-    parts = [part.strip() for part in selector.split(sep="/")]
+    assert path is not None
+    if not bool(path) or any(
+        not bool(component.strip()) for component in path
+    ):
+        message = "Section path must contain nonempty headings"
+        raise ValueError(message)
     matches: list[nodes.section] = [
-        section for section in sections if section[0].astext() == parts[0]
+        section for section in sections if section[0].astext() == path[0]
     ]
-    for part in parts[1:]:
+    for component in path[1:]:
         matches = [
             child
             for section in matches
             for child in section.children
-            if isinstance(child, nodes.section) and child[0].astext() == part
+            if isinstance(child, nodes.section)
+            and child[0].astext() == component
         ]
     return matches
 
 
 def select_section(
-    *, document: nodes.document | nodes.section, selector: str
+    *,
+    document: nodes.document | nodes.section,
+    title: str | None = None,
+    path: tuple[str, ...] | None = None,
+    label: str | None = None,
 ) -> nodes.section:
-    """Require exactly one matching section."""
-    matches = find_sections(document=document, selector=selector)
+    """Require exactly one section for an explicit title, path, or
+    label.
+    """
+    matches = find_sections(
+        document=document, title=title, path=path, label=label
+    )
     if len(matches) != 1:
         message = (
-            f"Expected one section for {selector!r}, found {len(matches)}"
+            f"Expected one section for title={title!r}, path={path!r}, "
+            f"label={label!r}, found {len(matches)}"
         )
         raise ValueError(message)
     return matches[0]
