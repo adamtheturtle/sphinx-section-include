@@ -121,3 +121,54 @@ An explicit ``docname`` selects a parsing context and reuses the source only whe
 RST sources must remain inside the Sphinx source directory, and recursive includes remain errors.
 Use ``section_source(..., docname=directive.env.docname)`` when extension collectors should attribute parsed content to the consuming document.
 Reference and resource origins remain tied to the selected source.
+
+Scoped source preparation
+-------------------------
+
+Use ``prepare_sources`` to apply a caller-supplied callback before section selection and copying.
+The callback receives a parsed ``docutils.nodes.document`` positionally and mutates it in place.
+It runs for freshly loaded sources reached through ``read_document``, ``section_source``, and ``include-section`` while the context is active in that Sphinx environment.
+Ordinary Sphinx source parsing is unaffected.
+
+.. code-block:: python
+
+   """Apply a local presentation rule to section sources."""
+
+   from docutils import nodes
+   from sphinx.util.docutils import SphinxDirective
+
+   from sphinx_section_include import prepare_sources, section_source
+
+   __all__ = ["render_prepared"]
+
+
+   def prepare_document(document: nodes.document, /) -> None:
+       """Mark code examples using this consumer's presentation rule."""
+       for example in document.findall(condition=nodes.literal_block):
+           if "prepared-example" not in example["classes"]:
+               example["classes"].append("prepared-example")
+
+
+   def render_prepared(*, directive: SphinxDirective) -> list[nodes.Node]:
+       """Prepare primary and additional section sources within one scope."""
+       container = nodes.container()
+       with (
+           prepare_sources(directive=directive, prepare=prepare_document),
+           section_source(directive=directive, source="manual.rst"),
+       ):
+           _ = directive.state.nested_parse(
+               block=directive.content,
+               input_offset=directive.content_offset,
+               node=container,
+           )
+       return container.children
+
+Repeated reads of a tree shared by ``section_source`` reuse its prepared result without applying the callback again.
+Trees prepared in another scope are not reused, even if that scope used the same callback function.
+Each nested preparation replaces its environment's outer callback and restores it after success or failure.
+Other Sphinx environments are unaffected.
+
+Nested section includes prepare their source documents before copying them into their parent source.
+The callback later sees those copied descendants when preparing the parent's assembled tree, so transformations over descendants should be idempotent.
+Your callback supplies presentation and validation rules.
+RST path validation, dependency tracking, and circular-include checks still apply.
