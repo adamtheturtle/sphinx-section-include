@@ -10,6 +10,7 @@ from sphinx_section_include.directive import (
     resolve_included_references,
 )
 from sphinx_section_include.reader import (
+    prepare_sources,
     read_document,
     resolve_source,
     section_source,
@@ -23,6 +24,7 @@ from sphinx_section_include.sections import (
 __all__ = [
     "copy_section",
     "find_sections",
+    "prepare_sources",
     "read_document",
     "resolve_source",
     "section_source",
