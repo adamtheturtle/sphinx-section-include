@@ -6,16 +6,31 @@ import base64
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Literal, override
 
 import pytest
 from bs4 import BeautifulSoup
 from docutils import nodes
 from sphinx.errors import NoUri
 from sphinx.testing.util import SphinxTestApp
+from sphinx.util.docutils import SphinxDirective
 from sphinx.util.parallel import parallel_available
 
 from sphinx_section_include.directive import resolve_included_references
+
+
+class OwnershipProbe(SphinxDirective):
+    """Inspect copied content before document transforms run."""
+
+    @override
+    def run(self) -> list[nodes.Node]:
+        """Require every copied node to belong to the consuming
+        document.
+        """
+        document = self.state.document
+        assert "Included instructions." in document.astext()
+        assert all(node.document is document for node in document.findall())
+        return []
 
 
 def write_project(*, root: Path, directive: str) -> None:
@@ -107,11 +122,13 @@ def test_include_preserves_content_and_links(
     )
     if include_heading:
         directive += "   :include-heading:\n"
+    directive += "\n.. ownership-probe::\n"
     source = tmp_path / "source"
     write_project(root=source, directive=directive)
     app = make_app(
         srcdir=source, buildername=buildername, exception_on_warning=True
     )
+    app.add_directive(name="ownership-probe", cls=OwnershipProbe)
     app.build()
     assert app.statuscode == 0
     assert app.warning.getvalue() == ""

@@ -29,6 +29,8 @@ def _prepare_nodes(
     """Prefix copied targets and retain external reference origins."""
     container = nodes.container()
     container.extend(item=content)
+    for node in container.findall():
+        node.document = directive.state.document
     serial = directive.env.new_serialno(category="section-include")
     document_id = directive.env.docname.encode(encoding="utf-8").hex()
     prefix = f"section-include-{document_id}-{serial}-"
@@ -48,7 +50,6 @@ def _prepare_nodes(
         element["names"] = [names[name] for name in element["names"]]
         if bool(element["ids"]) or bool(element["names"]):
             directive.state.document.note_explicit_target(target=element)
-        element.document = directive.state.document
         if isinstance(element, addnodes.pending_xref):
             _prepare_cross_reference(
                 reference=element,
