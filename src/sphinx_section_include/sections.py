@@ -1,8 +1,9 @@
-"""Select and copy parsed sections without imposing presentation
-policy.
-"""
+"""Select and copy parsed document sections."""
+
+from typing import Literal
 
 from docutils import nodes
+from docutils.parsers.rst import directives
 
 
 def find_sections(
@@ -85,12 +86,17 @@ def copy_section(
     section: nodes.section,
     include_heading: bool = True,
     exclude_sections: tuple[nodes.section, ...] = (),
+    heading_style: Literal["section", "rubric"] = "section",
 ) -> list[nodes.Node]:
     """Copy a subtree, preserving headings, anchors, and source metadata.
 
     Exclusions must be resolved descendants of the selected section.
-    The source tree is never modified.
+    The source tree is never modified. Rubric style turns every included
+    section heading into an informal heading outside the section hierarchy.
     """
+    style = directives.choice(
+        argument=heading_style, values=("section", "rubric")
+    )
     originals = list(section.findall(condition=nodes.section))
     identities = {id(node) for node in originals if node is not section}
     if any(id(node) not in identities for node in exclude_sections):
@@ -103,4 +109,36 @@ def copy_section(
         if id(original) in excluded:
             assert target.parent is not None
             _ = target.parent.remove(item=target)
-    return [copied] if include_heading else copied.children[1:]
+    content: list[nodes.Node] = (
+        [copied] if include_heading else copied.children[1:]
+    )
+    if style == "rubric":
+        return _rubric_headings(content=content)
+    return content
+
+
+def _rubric_headings(*, content: list[nodes.Node]) -> list[nodes.Node]:
+    """Replace copied sections with native rubric headings and their
+    bodies.
+    """
+    container = nodes.container()
+    container.extend(item=content)
+    for section in list(container.findall(condition=nodes.section)):
+        title = section[0]
+        assert isinstance(title, nodes.title)
+        rubric = nodes.rubric(
+            title.rawsource,
+            "",
+            *title.children,
+            **{**title.attributes, **section.attributes},
+        )
+        for attribute in ("ids", "names", "classes", "dupnames", "backrefs"):
+            values: list[str] = [
+                *section.get(key=attribute, failobj=[]),
+                *title.get(key=attribute, failobj=[]),
+            ]
+            rubric[attribute] = list(dict.fromkeys(values))
+        rubric.source = title.source
+        rubric.line = title.line
+        section.replace_self(new=[rubric, *section.children[1:]])
+    return container.children

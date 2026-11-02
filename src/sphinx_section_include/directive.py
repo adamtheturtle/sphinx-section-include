@@ -3,6 +3,7 @@
 import json
 import posixpath
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar, TypeGuard, override
 from urllib.parse import urlsplit
@@ -242,6 +243,9 @@ class IncludeSection(SphinxDirective):
         "section-path": _heading_path,
         "section-label": directives.unchanged_required,
         "include-heading": directives.flag,
+        "heading-style": partial(
+            directives.choice, values=("section", "rubric")
+        ),
         "exclude-sections": directives.unchanged_required,
         "exclude-section-paths": _excluded_paths,
         "exclude-section-labels": directives.unchanged_required,
@@ -298,6 +302,7 @@ class IncludeSection(SphinxDirective):
                 section=selected,
                 include_heading="include-heading" in self.options,
                 exclude_sections=excluded,
+                heading_style=self.options.get("heading-style", "section"),
             )
             return _prepare_nodes(
                 directive=self,
