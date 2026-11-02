@@ -3,12 +3,14 @@
 from collections import Counter
 from collections.abc import Callable
 from copy import copy
+from functools import partial
 from pathlib import Path
 from typing import override
 
 import pytest
 from docutils import nodes
 from docutils.utils import new_document
+from sphinx.environment import BuildEnvironment
 from sphinx.testing.util import SphinxTestApp
 from sphinx.util.docutils import SphinxDirective
 
@@ -55,6 +57,52 @@ def write_project(*, root: Path, nested: bool) -> None:
         )
     for name, content in files.items():
         _ = (root / name).write_text(data=content)
+
+
+def _other_environment(
+    *, directive: SphinxDirective, app: SphinxTestApp
+) -> SphinxDirective:
+    """Use a separate environment with the same files and
+    configuration.
+    """
+    other = copy(x=directive)
+    other.state = copy(x=directive.state)
+    settings = copy(x=directive.state.document.settings)
+    environment = BuildEnvironment(app=app)
+    environment.setup(app=app)
+    environment.current_document = copy(x=directive.env.current_document)
+    settings.env = environment
+    other.state.document = new_document(
+        source_path=str(
+            object=directive.env.doc2path(docname=directive.env.docname)
+        ),
+        settings=settings,
+    )
+    return other
+
+
+def _mark_source(
+    document: nodes.document,
+    /,
+    *,
+    marker: list[str],
+    observed: list[str],
+) -> None:
+    """Prepare a tree using values which can change between scopes."""
+    observed.append(marker[0])
+    document += nodes.paragraph("", marker[0])
+
+
+def _prepare_inner(document: nodes.document, /) -> None:
+    """Replace the surrounding transform without composing with it."""
+    document += nodes.paragraph("", "Inner marker.")
+
+
+def _abort_preparation(document: nodes.document, /) -> None:
+    """Fail after mutation to expose accidental retention of that tree."""
+    document += nodes.paragraph("", "Aborted mutation.")
+    message = "Preparation aborted"
+    raise ValueError(message)
 
 
 @pytest.mark.parametrize(argnames="buildername", argvalues=["html", "text"])
@@ -156,20 +204,7 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
     observed: list[str] = []
     marker = ["Outer marker."]
 
-    def outer(document: nodes.document, /) -> None:
-        """Prepare a tree using values which can change between scopes."""
-        observed.append(marker[0])
-        document += nodes.paragraph("", marker[0])
-
-    def inner(document: nodes.document, /) -> None:
-        """Replace the surrounding transform without composing with it."""
-        document += nodes.paragraph("", "Inner marker.")
-
-    def fail(document: nodes.document, /) -> None:
-        """Fail after mutation to expose accidental retention of that tree."""
-        document += nodes.paragraph("", "Aborted mutation.")
-        message = "Preparation aborted"
-        raise ValueError(message)
+    outer = partial(_mark_source, marker=marker, observed=observed)
 
     class InspectPreparation(SphinxDirective):
         """Exercise source identity while nesting real preparation
@@ -194,26 +229,15 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
                             read_document(directive=self, source="manual.rst")
                             is prepared
                         )
-                        other = copy(x=self)
-                        other.state = copy(x=self.state)
-                        settings = copy(x=self.state.document.settings)
-                        other_environment = copy(x=self.env)
-                        other_environment.events = self.env.events
-                        settings.env = other_environment
-                        other.state.document = new_document(
-                            source_path=str(
-                                object=self.env.doc2path(
-                                    docname=self.env.docname
-                                )
-                            ),
-                            settings=settings,
-                        )
+                        other = _other_environment(directive=self, app=app)
                         unprepared = read_document(
                             directive=other, source="manual.rst"
                         )
                         assert "Outer marker." not in unprepared.astext()
                         with (
-                            prepare_sources(directive=self, prepare=inner),
+                            prepare_sources(
+                                directive=self, prepare=_prepare_inner
+                            ),
                             section_source(
                                 directive=self, source="manual.rst"
                             ) as nested,
@@ -241,7 +265,9 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
                                 expected_exception=ValueError,
                                 match="Preparation aborted",
                             ),
-                            prepare_sources(directive=self, prepare=fail),
+                            prepare_sources(
+                                directive=self, prepare=_abort_preparation
+                            ),
                         ):
                             _ = read_document(
                                 directive=self, source="manual.rst"

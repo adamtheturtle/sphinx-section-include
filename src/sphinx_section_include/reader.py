@@ -169,12 +169,13 @@ def read_document(
         raise ValueError(message)
     preparation = _preparation_for(environment=directive.env)
     for prepared in reversed(_sources.get()):
+        if prepared.preparation is not preparation:
+            continue
         if (
             prepared.environment is directive.env
             and prepared.docname == directive.env.docname
             and prepared.path == path
             and (docname is None or docname == prepared.parsing_docname)
-            and prepared.preparation is preparation
         ):
             directive.env.note_dependency(filename=path)
             return prepared.document
