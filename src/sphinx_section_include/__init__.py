@@ -20,6 +20,7 @@ from sphinx_section_include.sections import (
     find_sections,
     select_section,
 )
+from sphinx_section_include.validation import validate_sections
 
 __all__ = [
     "copy_section",
@@ -29,6 +30,7 @@ __all__ = [
     "resolve_source",
     "section_source",
     "select_section",
+    "validate_sections",
 ]
 __version__ = version(distribution_name="sphinx-section-include")
 
