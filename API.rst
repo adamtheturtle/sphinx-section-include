@@ -167,6 +167,8 @@ Repeated reads of a tree shared by ``section_source`` reuse its prepared result 
 Trees prepared in another scope are not reused, even if that scope used the same callback function.
 Each nested preparation replaces its environment's outer callback and restores it after success or failure.
 Other Sphinx environments are unaffected.
+Pass ``docname=directive.env.docname`` to attribute collected content from every source in the scope to the consuming document.
+An explicit ``docname`` on ``read_document`` or ``section_source`` takes precedence over the scoped value.
 
 Nested section includes prepare their source documents before copying them into their parent source.
 The callback later sees those copied descendants when preparing the parent's assembled tree, so transformations over descendants should be idempotent.

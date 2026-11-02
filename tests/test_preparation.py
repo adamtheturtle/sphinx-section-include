@@ -21,6 +21,17 @@ from sphinx_section_include import (
 )
 
 
+class ParsingContext(SphinxDirective):
+    """Expose the document used by source collectors during parsing."""
+
+    @override
+    def run(self) -> list[nodes.Node]:
+        """Record the active parsing context in ordinary source
+        content.
+        """
+        return [nodes.paragraph("", "Parsed under " + self.env.docname)]
+
+
 def write_project(*, root: Path, nested: bool) -> None:
     """Create primary, additional, and unprepared section consumers."""
     root.mkdir()
@@ -32,10 +43,11 @@ def write_project(*, root: Path, nested: bool) -> None:
         ),
         "manual.rst": (
             "Manual\n======\n\nBefore\n------\n\nPrimary content.\n\n"
-            ".. include:: prerequisite.txt\n"
+            ".. parse-context::\n\n.. include:: prerequisite.txt\n"
         ),
         "other.rst": (
-            "Other\n=====\n\nBefore\n------\n\nSecondary content.\n"
+            "Other\n=====\n\nBefore\n------\n\nSecondary content.\n\n"
+            ".. parse-context::\n"
         ),
         "overview.rst": (
             "Overview\n========\n\n.. include-section:: manual.rst\n"
@@ -53,7 +65,8 @@ def write_project(*, root: Path, nested: bool) -> None:
             "\n.. include-section:: nested.rst\n   :section: Shared\n"
         )
         files["nested.rst"] = (
-            "Nested\n======\n\nShared\n------\n\nNested prerequisite.\n"
+            "Nested\n======\n\nShared\n------\n\nNested prerequisite.\n\n"
+            ".. parse-context::\n"
         )
     for name, content in files.items():
         _ = (root / name).write_text(data=content)
@@ -79,6 +92,15 @@ def _other_environment(
         settings=settings,
     )
     return other
+
+
+def _assert_explicit_context(*, directive: SphinxDirective) -> None:
+    """An explicit parsing context overrides the scoped default."""
+    explicit = read_document(
+        directive=directive, source="manual.rst", docname="outside"
+    )
+    assert "Parsed under outside" in explicit.astext()
+    assert "Parsed under overview" not in explicit.astext()
 
 
 def _mark_source(
@@ -150,11 +172,14 @@ def test_preparation_covers_composition_sources_and_dependencies(
             """
             container = nodes.container()
             with (
-                prepare_sources(directive=self, prepare=prepare),
+                prepare_sources(
+                    directive=self,
+                    prepare=prepare,
+                    docname=self.env.docname if consumer_context else None,
+                ),
                 section_source(
                     directive=self,
                     source="manual.rst",
-                    docname=self.env.docname if consumer_context else None,
                 ),
             ):
                 _ = self.state.nested_parse(
@@ -170,6 +195,7 @@ def test_preparation_covers_composition_sources_and_dependencies(
         exception_on_warning=True,
     )
     app.add_directive(name="prepared-composition", cls=PreparedComposition)
+    app.add_directive(name="parse-context", cls=ParsingContext)
     app.build()
     assert Counter(reads) == Counter({"Nested": 1, "Manual": 1, "Other": 1})
     text = app.env.get_doctree(docname="overview").astext()
@@ -177,6 +203,11 @@ def test_preparation_covers_composition_sources_and_dependencies(
     assert text.count("Primary content.") == expected_primary
     assert "Secondary content." in text
     assert "Original prerequisite." in text
+    contexts = (
+        ("overview",) if consumer_context else ("manual", "other", "nested")
+    )
+    for context in contexts:
+        assert "Parsed under " + context in text
     for docname in ("manual", "outside"):
         original = app.env.get_doctree(docname=docname).astext()
         assert "Before" in original
@@ -219,12 +250,16 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
             with section_source(
                 directive=self, source="manual.rst"
             ) as original:
-                with prepare_sources(directive=self, prepare=outer):
+                with prepare_sources(
+                    directive=self, prepare=outer, docname=self.env.docname
+                ):
                     with section_source(
                         directive=self, source="manual.rst"
                     ) as prepared:
                         assert prepared is not original
                         assert "Outer marker." in prepared.astext()
+                        assert "Parsed under overview" in prepared.astext()
+                        _assert_explicit_context(directive=self)
                         assert (
                             read_document(directive=self, source="manual.rst")
                             is prepared
@@ -252,7 +287,11 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
                                 is nested
                             )
                         marker[0] = "Replacement marker."
-                        with prepare_sources(directive=self, prepare=outer):
+                        with prepare_sources(
+                            directive=self,
+                            prepare=outer,
+                            docname=self.env.docname,
+                        ):
                             replaced = read_document(
                                 directive=self, source="manual.rst"
                             )
@@ -293,8 +332,10 @@ def test_nested_preparations_restore_trees_and_isolate_environments(
 
     app = make_app(srcdir=source, exception_on_warning=True)
     app.add_directive(name="inspect-preparation", cls=InspectPreparation)
+    app.add_directive(name="parse-context", cls=ParsingContext)
     app.build()
     assert observed == [
+        "Outer marker.",
         "Outer marker.",
         "Replacement marker.",
         "Outer marker.",

@@ -30,6 +30,7 @@ class _Preparation:
 
     environment: BuildEnvironment
     prepare: Callable[[nodes.document], None]
+    docname: str | None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -65,6 +66,7 @@ def prepare_sources(
     *,
     directive: SphinxDirective,
     prepare: Callable[[nodes.document], None],
+    docname: str | None = None,
 ) -> Generator[None]:
     """Prepare freshly read section sources before selection or copying.
 
@@ -73,11 +75,15 @@ def prepare_sources(
     read by nested section includes. Nested preparations replace the outer
     callback for their environment and restore it on success or failure.
     Prepared trees are reused only within the same preparation scope.
+    An optional document name supplies the parsing context for reads that
+    do not explicitly select one.
     """
     token = _preparations.set(
         (
             *_preparations.get(),
-            _Preparation(environment=directive.env, prepare=prepare),
+            _Preparation(
+                environment=directive.env, prepare=prepare, docname=docname
+            ),
         )
     )
     try:
@@ -99,6 +105,8 @@ def section_source(
     """
     path = resolve_source(directive=directive, source=source)
     preparation = _preparation_for(environment=directive.env)
+    if docname is None and preparation is not None:
+        docname = preparation.docname
     document = read_document(
         directive=directive, source=source, docname=docname
     )
@@ -168,6 +176,8 @@ def read_document(
         message = f"Circular section include involving {path.name!r}"
         raise ValueError(message)
     preparation = _preparation_for(environment=directive.env)
+    if docname is None and preparation is not None:
+        docname = preparation.docname
     for prepared in reversed(_sources.get()):
         if prepared.preparation is not preparation:
             continue
