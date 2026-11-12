@@ -370,7 +370,6 @@ num_workers = "auto"
 # Include the test package alongside the installed source package.
 search-path = [ "src", "." ]
 errors.non-exhaustive-match = "error"
-coverage.includes = [ "src/**" ]
 enabled-ignores = [ "pyrefly" ]
 preset = "all"
 
