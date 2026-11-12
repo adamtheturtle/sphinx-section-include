@@ -32,7 +32,7 @@ __all__ = [
     "select_section",
     "validate_sections",
 ]
-__version__ = version(distribution_name="sphinx-section-include")
+__version__: str = version(distribution_name="sphinx-section-include")
 
 
 def setup(app: Sphinx) -> ExtensionMetadata:
