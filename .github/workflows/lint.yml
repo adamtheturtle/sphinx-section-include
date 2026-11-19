@@ -37,7 +37,7 @@ jobs:
             uv.lock
 
       - name: Lint
-        uses: j178/prek-action@v3.1.0
+        uses: j178/prek-action@v3.1.1
         with:
           prek-version: 0.5.7
           extra-args: >-
