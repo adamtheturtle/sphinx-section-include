@@ -10,7 +10,7 @@ Explicit section selection
 
 Pass exactly one of ``title``, ``path``, or ``label`` to ``find_sections`` or ``select_section``.
 For example, ``select_section(document=document, title="Input / output")`` selects that literal heading, while ``path=("Q1", "Input / output")`` selects it directly beneath ``Q1``.
-``label="stable-prompt"`` selects the section carrying that RST label, using Docutils name normalization.
+``label="stable-prompt"`` selects the section with that RST label, using Docutils name normalization.
 Titles and path components are exact, case-sensitive text.
 ``/`` and ``#`` have no special meaning.
 The first path component may occur at any depth in the supplied document or section.
