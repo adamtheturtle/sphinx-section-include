@@ -61,14 +61,14 @@ dev = [
     "prek==0.5.11",
     "pydocstringformatter==1.0.0",
     "pylint[spelling]==4.1.4",
-    "pyproject-fmt==2.30.6",
+    "pyproject-fmt==2.31.2",
     "pyrefly==1.5.0",
     "pyright==1.1.414",
     "pyroma==5.0.1",
     "pytest==9.2.0",
     "pytest-beartype==0.3.0",
     "pytest-cov==7.1.0",
-    "ruff==0.17.5",
+    "ruff==0.17.6",
     # We add shellcheck-py not only for shell scripts and shell code blocks,
     # but also because having it installed means that ``actionlint-py`` will
     # use it to lint shell commands in GitHub workflow files.
@@ -78,7 +78,7 @@ dev = [
     "sphinx-lint==1.0.2",
     "strict-kwargs==2026.11.14",
     "towncrier==26.9.0",
-    "ty==0.0.105",
+    "ty==0.0.107",
     "types-docutils==0.23.0.20261107",
     "vale==3.27.0.0",
     "vulture==2.16",
@@ -370,7 +370,9 @@ num_workers = "auto"
 [tool.pyrefly]
 # Include the test package alongside the installed source package.
 search-path = [ "src", "." ]
+errors.explicit-any-use = "warn"
 errors.non-exhaustive-match = "error"
+errors.partially-unknown-type = "warn"
 enabled-ignores = [ "pyrefly" ]
 preset = "all"
 
