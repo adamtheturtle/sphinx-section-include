@@ -97,7 +97,10 @@ def _prepare_cross_reference(
     """
     if reference.get(key="refdomain") == "std":
         reference_type: object = reference.get(key="reftype")
-        if reference_type in ("ref", "doc"):
+        if isinstance(reference_type, str) and reference_type in {
+            "ref",
+            "doc",
+        }:
             target: object = reference["reftarget"]
             assert isinstance(target, str)
             if reference_type == "ref" and target in names:
@@ -254,7 +257,7 @@ def _is_heading_style(
     value: object, /
 ) -> TypeGuard[Literal["section", "rubric"]]:
     """Identify a heading style accepted by the directive."""
-    return isinstance(value, str) and value in ("section", "rubric")
+    return isinstance(value, str) and value in {"section", "rubric"}
 
 
 class IncludeSection(SphinxDirective):

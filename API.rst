@@ -134,6 +134,8 @@ Ordinary Sphinx source parsing is unaffected.
 
    """Apply a local presentation rule to section sources."""
 
+   from typing import TypeGuard
+
    from docutils import nodes
    from sphinx.util.docutils import SphinxDirective
 
@@ -142,11 +144,18 @@ Ordinary Sphinx source parsing is unaffected.
    __all__ = ["render_prepared"]
 
 
+   def is_class_list(value: object, /) -> TypeGuard[list[object]]:
+       """Recognize the list Docutils stores for CSS classes."""
+       return isinstance(value, list)
+
+
    def prepare_document(document: nodes.document, /) -> None:
        """Mark code examples using this consumer's presentation rule."""
        for example in document.findall(condition=nodes.literal_block):
-           if "prepared-example" not in example["classes"]:
-               example["classes"].append("prepared-example")
+           classes: object = example["classes"]
+           assert is_class_list(classes)
+           if "prepared-example" not in classes:
+               classes.append("prepared-example")
 
 
    def render_prepared(*, directive: SphinxDirective) -> list[nodes.Node]:
