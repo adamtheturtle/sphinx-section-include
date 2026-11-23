@@ -5,7 +5,7 @@ import posixpath
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Any, ClassVar, TypeGuard, override
+from typing import ClassVar, Literal, TypeGuard, override
 from urllib.parse import urlsplit
 
 from docutils import nodes
@@ -16,6 +16,12 @@ from sphinx.errors import NoUri
 from sphinx.util import docname_join
 from sphinx.util.docutils import SphinxDirective
 
+from sphinx_section_include._types import (
+    is_heading_paths,
+    is_list,
+    is_string_list,
+    is_string_tuple,
+)
 from sphinx_section_include.reader import read_document, resolve_source
 from sphinx_section_include.sections import copy_section, select_section
 from sphinx_section_include.validation import validate_content
@@ -35,21 +41,27 @@ def _prepare_nodes(
     serial = directive.env.new_serialno(category="section-include")
     document_id = directive.env.docname.encode(encoding="utf-8").hex()
     prefix = f"section-include-{document_id}-{serial}-"
-    elements = list(container.findall(condition=nodes.Element))
+    elements: list[tuple[nodes.Element, list[str], list[str]]] = []
+    for element in container.findall(condition=nodes.Element):
+        ids: object = element["ids"]
+        element_names: object = element["names"]
+        assert is_string_list(ids)
+        assert is_string_list(element_names)
+        elements.append((element, ids, element_names))
     identities = {
         identity: prefix + identity
-        for element in elements
-        for identity in element["ids"]
+        for _, ids, _ in elements
+        for identity in ids
     }
     names = {
         name: prefix + name
-        for element in elements
-        for name in element["names"]
+        for _, _, element_names in elements
+        for name in element_names
     }
-    for element in elements:
-        element["ids"] = [identities[identity] for identity in element["ids"]]
-        element["names"] = [names[name] for name in element["names"]]
-        if bool(element["ids"]) or bool(element["names"]):
+    for element, ids, element_names in elements:
+        element["ids"] = [identities[identity] for identity in ids]
+        element["names"] = [names[name] for name in element_names]
+        if bool(ids) or bool(element_names):
             directive.state.document.note_explicit_target(target=element)
         if isinstance(element, addnodes.pending_xref):
             _prepare_cross_reference(
@@ -84,15 +96,16 @@ def _prepare_cross_reference(
     document.
     """
     if reference.get(key="refdomain") == "std":
-        if (
-            reference.get(key="reftype") == "ref"
-            and reference["reftarget"] in names
-        ):
-            reference["reftarget"] = names[reference["reftarget"]]
-        elif reference.get(key="reftype") == "doc":
-            reference["reftarget"] = "/" + docname_join(
-                basedocname=source_docname, docname=reference["reftarget"]
-            )
+        reference_type: object = reference.get(key="reftype")
+        if reference_type in ("ref", "doc"):
+            target: object = reference["reftarget"]
+            assert isinstance(target, str)
+            if reference_type == "ref" and target in names:
+                reference["reftarget"] = names[target]
+            elif reference_type == "doc":
+                reference["reftarget"] = "/" + docname_join(
+                    basedocname=source_docname, docname=target
+                )
     reference["refdoc"] = docname
 
 
@@ -114,7 +127,8 @@ def _prepare_reference(
 ) -> None:
     """Distinguish anchors inside the excerpt from links to its source."""
     if "refid" in reference:
-        target = reference["refid"]
+        target: object = reference["refid"]
+        assert isinstance(target, str)
         if target in identities:
             reference["refid"] = identities[target]
         else:
@@ -123,10 +137,13 @@ def _prepare_reference(
                 key="section_include_origin", failobj=source_docname
             )
             reference["section_include_anchor"] = target
-    elif "refuri" in reference and _is_relative_uri(uri=reference["refuri"]):
-        _ = reference.setdefault(
-            key="section_include_origin", failobj=source_docname
-        )
+    elif "refuri" in reference:
+        uri: object = reference["refuri"]
+        assert isinstance(uri, str)
+        if _is_relative_uri(uri=uri):
+            _ = reference.setdefault(
+                key="section_include_origin", failobj=source_docname
+            )
 
 
 def _prepare_image(
@@ -138,7 +155,9 @@ def _prepare_image(
     """Resolve local image paths before the caller collects image
     assets.
     """
-    if not _is_relative_uri(uri=image["uri"]):
+    uri: object = image["uri"]
+    assert isinstance(uri, str)
+    if not _is_relative_uri(uri=uri):
         return
     origin = Path(
         image.source
@@ -150,9 +169,7 @@ def _prepare_image(
         .relative_to(Path(directive.env.srcdir).resolve())
         .as_posix()
     )
-    image["uri"] = "/" + posixpath.normpath(
-        path=posixpath.join(relative, str(object=image["uri"]))
-    )
+    image["uri"] = "/" + posixpath.normpath(path=posixpath.join(relative, uri))
 
 
 def resolve_included_references(
@@ -160,21 +177,25 @@ def resolve_included_references(
 ) -> None:
     """Resolve source links using the active builder's URI conventions."""
     for reference in doctree.findall(condition=nodes.reference):
-        origin = reference.get(key="section_include_origin")
+        origin: object = reference.get(key="section_include_origin")
         if origin is None:
             continue
+        assert isinstance(origin, str)
         try:
             base = app.builder.get_relative_uri(from_=docname, to=origin)
         except NoUri:
             reference.replace_self(new=reference.children)
             continue
-        anchor = reference.get(key="section_include_anchor")
+        anchor: object = reference.get(key="section_include_anchor")
         if anchor is not None:
+            assert isinstance(anchor, str)
             reference["refuri"] = base + "#" + anchor
         else:
             # Keep paths relative to the original rendered document.
 
-            parsed = urlsplit(url=str(object=reference["refuri"]))
+            uri: object = reference["refuri"]
+            assert isinstance(uri, str)
+            parsed = urlsplit(url=uri)
             path = (
                 posixpath.normpath(
                     path=posixpath.join(posixpath.dirname(base), parsed.path)
@@ -196,11 +217,6 @@ def _heading_path(argument: str | None, /) -> tuple[str, ...]:
     return tuple(line.strip() for line in value.strip().splitlines())
 
 
-def _is_json_array(value: object, /) -> TypeGuard[list[object]]:
-    """Narrow JSON arrays without assuming element types."""
-    return isinstance(value, list)
-
-
 def _excluded_paths(argument: str | None, /) -> tuple[tuple[str, ...], ...]:
     """Read one JSON array per excluded heading path."""
     value = argument if argument is not None else ""
@@ -210,7 +226,7 @@ def _excluded_paths(argument: str | None, /) -> tuple[tuple[str, ...], ...]:
     paths: list[tuple[str, ...]] = []
     for line in value.strip().splitlines():
         decoded: object = json.loads(s=line)
-        if _is_json_array(decoded):
+        if is_list(decoded):
             components: list[object] = decoded
         else:
             message = (
@@ -234,13 +250,20 @@ def _excluded_paths(argument: str | None, /) -> tuple[tuple[str, ...], ...]:
     return tuple(paths)
 
 
+def _is_heading_style(
+    value: object, /
+) -> TypeGuard[Literal["section", "rubric"]]:
+    """Identify a heading style accepted by the directive."""
+    return isinstance(value, str) and value in ("section", "rubric")
+
+
 class IncludeSection(SphinxDirective):
     """Include one exact section while preserving its document
     structure.
     """
 
     required_arguments = 1
-    option_spec: ClassVar[dict[str, Callable[[str], Any]] | None] = {  # pyrefly: ignore[explicit-any]
+    option_spec: ClassVar[dict[str, Callable[[str], object]] | None] = {
         "section": directives.unchanged_required,
         "section-path": _heading_path,
         "section-label": directives.unchanged_required,
@@ -274,37 +297,50 @@ class IncludeSection(SphinxDirective):
         try:
             path = resolve_source(directive=self, source=self.arguments[0])
             document = read_document(directive=self, source=self.arguments[0])
+            title: object = self.options.get("section")
+            heading_path: object = self.options.get("section-path")
+            label: object = self.options.get("section-label")
+            assert title is None or isinstance(title, str)
+            assert heading_path is None or is_string_tuple(heading_path)
+            assert label is None or isinstance(label, str)
             selected = select_section(
-                document=document,
-                title=self.options.get("section"),
-                path=self.options.get("section-path"),
-                label=self.options.get("section-label"),
+                document=document, title=title, path=heading_path, label=label
             )
+            excluded_titles: object = self.options.get("exclude-sections", "")
+            excluded_labels: object = self.options.get(
+                "exclude-section-labels", ""
+            )
+            excluded_paths: object = self.options.get(
+                "exclude-section-paths", ()
+            )
+            heading_style: object = self.options.get(
+                "heading-style", "section"
+            )
+            assert isinstance(excluded_titles, str)
+            assert isinstance(excluded_labels, str)
+            assert is_heading_paths(excluded_paths)
+            assert _is_heading_style(heading_style)
             excluded = (
                 tuple(
                     select_section(document=selected, title=title.strip())
-                    for title in self.options.get(
-                        "exclude-sections", ""
-                    ).splitlines()
+                    for title in excluded_titles.splitlines()
                     if bool(title.strip())
                 )
                 + tuple(
                     select_section(document=selected, label=label.strip())
-                    for label in self.options.get(
-                        "exclude-section-labels", ""
-                    ).splitlines()
+                    for label in excluded_labels.splitlines()
                     if bool(label.strip())
                 )
                 + tuple(
                     select_section(document=selected, path=path)
-                    for path in self.options.get("exclude-section-paths", ())
+                    for path in excluded_paths
                 )
             )
             content = copy_section(
                 section=selected,
                 include_heading="include-heading" in self.options,
                 exclude_sections=excluded,
-                heading_style=self.options.get("heading-style", "section"),
+                heading_style=heading_style,
             )
             validate_content(directive=self, content=content)
             return _prepare_nodes(

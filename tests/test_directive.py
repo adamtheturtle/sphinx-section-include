@@ -16,6 +16,7 @@ from sphinx.testing.util import SphinxTestApp
 from sphinx.util.docutils import SphinxDirective
 from sphinx.util.parallel import parallel_available
 
+from sphinx_section_include._types import is_string_list
 from sphinx_section_include.directive import resolve_included_references
 
 
@@ -146,7 +147,9 @@ def test_include_preserves_content_and_links(
             assert rubric.source is not None
             assert rubric.source.endswith("manual/source.rst")
             assert rubric.line is not None
-            for identity in rubric["ids"]:
+            ids: object = rubric["ids"]
+            assert is_string_list(ids)
+            for identity in ids:
                 assert tree.ids[identity] is rubric
     else:
         assert len(list(tree.findall(condition=nodes.section))) == (

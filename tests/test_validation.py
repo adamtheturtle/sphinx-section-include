@@ -61,8 +61,10 @@ def _other_environment(
         source_path=str(object=directive.env.doc2path(docname="overview")),
         settings=settings,
     )
-    other.state.memo = copy(x=directive.state.memo)
-    other.state.memo.document = other.state.document
+    memo: object = vars(directive.state)["memo"]
+    other_memo = copy(x=memo)
+    vars(other_memo)["document"] = other.state.document
+    other.state.memo = other_memo
     return other
 
 
