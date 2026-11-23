@@ -425,11 +425,17 @@ def test_external_resources_and_cross_references(
         .replace(
             "See Details_ and Outside_.",
             "See Details_ and Outside_.\n\n"
-            "See :ref:`outside-label` and :py:func:`unknown_function`.\n\n"
+            "See :ref:`outside-label`, :py:func:`unknown_function`, "
+            "and :term:`External term`.\n\n"
             ".. image:: https://example.com/remote.png\n\n"
             "Link `query <?view=all>`_.",
         )
         .replace("Outside\n~~~~~~~", ".. _outside-label:\n\nOutside\n~~~~~~~")
+    )
+    other = source / "manual/other.rst"
+    _ = other.write_text(
+        data=other.read_text()
+        + "\n.. glossary::\n\n   External term\n      Term definition.\n"
     )
     app = make_app(srcdir=source, exception_on_warning=True)
     app.build()
@@ -438,6 +444,7 @@ def test_external_resources_and_cross_references(
     assert 'href="manual/source.html#outside-label"' in html
     assert 'href="manual/source.html?view=all"' in html
     assert "unknown_function" in html
+    assert 'href="manual/other.html#term-External-term"' in html
     assert app.warning.getvalue() == ""
 
 
