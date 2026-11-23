@@ -23,6 +23,8 @@ from sphinx.environment import BuildEnvironment
 from sphinx.transforms import DefaultSubstitutions
 from sphinx.util.docutils import LoggingReporter, SphinxDirective
 
+from sphinx_section_include._types import is_string_tuple
+
 
 @dataclass(frozen=True, kw_only=True)
 class _Preparation:
@@ -169,9 +171,8 @@ def read_document(
     path = resolve_source(directive=directive, source=source)
     root = Path(directive.env.srcdir).resolve()
     parent = directive.state.document
-    ancestors = tuple[str, ...](
-        parent.get(key="_section_include_sources", failobj=())
-    )
+    ancestors: object = parent.attributes.get("_section_include_sources", ())
+    assert is_string_tuple(ancestors)
     if str(object=path) in ancestors:
         message = f"Circular section include involving {path.name!r}"
         raise ValueError(message)
@@ -211,12 +212,16 @@ def read_document(
     env.note_dependency(filename=path)
     env.current_document = context
     try:
+        prolog: object = directive.config["rst_prolog"]
+        epilog: object = directive.config["rst_epilog"]
+        assert prolog is None or isinstance(prolog, str)
+        assert epilog is None or isinstance(epilog, str)
         text = "\n\n".join(
             part
             for part in (
-                directive.config.rst_prolog or "",
+                prolog if prolog is not None else "",
                 f".. include:: /{relative}",
-                directive.config.rst_epilog or "",
+                epilog if epilog is not None else "",
             )
             if bool(part)
         )
